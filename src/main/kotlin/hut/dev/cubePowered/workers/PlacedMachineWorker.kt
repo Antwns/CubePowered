@@ -1,13 +1,13 @@
 package hut.dev.cubePowered.workers
 
 import dev.lone.itemsadder.api.Events.CustomBlockBreakEvent
-import dev.lone.itemsadder.api.Events.CustomBlockInteractEvent
 import dev.lone.itemsadder.api.Events.CustomBlockPlaceEvent
 import dev.triumphteam.gui.guis.Gui
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.library.MachineInstance
 import net.kyori.adventure.text.Component
 import org.bukkit.plugin.Plugin
+import org.bukkit.scheduler.BukkitTask
 
 internal object PlacedMachineWorker {
 
@@ -90,15 +90,39 @@ internal object PlacedMachineWorker {
         plugin.logger.info("Grabbed broken block relevant info...")
         //find and remove the machine from memory
         val placedMachineToRemove = Lists.placedMachinesInstances.first { it.machineKey == blockWorld + "," + blockX + "," + blockY + "," + blockZ }
+        plugin.logger.info("Found relevant machine with key " + placedMachineToRemove.machineKey)
+        Lists.placedMachinesInstances.remove(placedMachineToRemove)
+        plugin.logger.info("Removed placed machine instance from memory")
         Lists.placedMachinesGuiInstances.remove(placedMachineToRemove.machineKey)
-        plugin.logger.info("Removed instance from memory")
+        plugin.logger.info("Removed placed machine GUI instance fromm memory")
         //find and remove machine runtime
-        for (recipeTaskToRemove in Lists.currentRecipeTasks) {
-            val currentRecipe = Lists.recipeInstances.first { it.assignedMachineInstance == placedMachineToRemove }
-            val recipeTaskToRemoveKey = currentRecipe.recipeId + placedMachineToRemove.machineKey
-            val recipeTaskToRemove = Lists.currentRecipeTasks[recipeTaskToRemoveKey]
-            Lists.currentRecipeTasks.remove(recipeTaskToRemoveKey)!!.cancel()
-            plugin.logger.info("Removed recipe task with key " + recipeTaskToRemoveKey)
+        var recipeTasksToRemove : MutableMap<String, BukkitTask> = mutableMapOf()
+        var recipeTaskToRemoveKey = ""
+        for (recipeTaskToCheck in Lists.currentRecipeTasks) {//this only checks for the first recipe, not the rest, I must fix it
+            for(currentRecipeToCheck in Lists.recipeInstances){
+
+                val recipeTaskKeyToCheck = currentRecipeToCheck.recipeId + placedMachineToRemove.machineKey
+                plugin.logger.info("Checking recipe with key " + recipeTaskKeyToCheck + " for machine with key " + placedMachineToRemove.machineKey)
+                if(currentRecipeToCheck.assignedMachineInstance.machineId == placedMachineToRemove.machineId)
+                {
+                    plugin.logger.info("Recipe with key " + recipeTaskKeyToCheck + " is assigned to the broken machine with key: " + placedMachineToRemove.machineKey)
+                    if(Lists.currentRecipeTasks.contains(recipeTaskKeyToCheck) == true)
+                    {
+                        recipeTaskToRemoveKey = recipeTaskKeyToCheck
+                        plugin.logger.info("Recipe task with key " + recipeTaskKeyToCheck + " is assigned to the broken machine with key: " + placedMachineToRemove.machineKey)
+                        recipeTasksToRemove[recipeTaskToRemoveKey] = Lists.currentRecipeTasks[recipeTaskKeyToCheck]!!
+                    }
+                }
+            }
         }
+        for (recipeTaskToRemove in recipeTasksToRemove) {
+            plugin.logger.info("Stopping recipe task with key " + recipeTaskToRemove.key)
+            Lists.currentRecipeTasks[recipeTaskToRemove.key]!!.cancel()
+            plugin.logger.info("Sanity check: Task with key " + recipeTaskToRemove.key + " canceled status is " + Lists.currentRecipeTasks[recipeTaskToRemove.key]!!.isCancelled.toString())
+            Lists.currentRecipeTasks.remove(recipeTaskToRemove.key)
+            plugin.logger.info("Removed recipe task with key " + recipeTaskToRemove.key)
+            plugin.logger.info("Finished cleaning data for formerly placed machine with key " + placedMachineToRemove.machineKey)
+        }
+        recipeTasksToRemove.clear()//clear the checker
     }
 }
