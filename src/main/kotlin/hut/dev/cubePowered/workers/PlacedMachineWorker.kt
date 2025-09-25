@@ -89,8 +89,7 @@ internal object PlacedMachineWorker {
         val blockWorld = e.block.world.name
         plugin.logger.info("Grabbed broken block relevant info...")
         //find and remove the machine from memory
-        val placedMachineToRemove =
-            Lists.placedMachinesInstances.first { it.machineKey == blockWorld + blockX + blockY + blockZ }
+        val placedMachineToRemove = Lists.placedMachinesInstances.first { it.machineKey == blockWorld + "," + blockX + "," + blockY + "," + blockZ }
         Lists.placedMachinesGuiInstances.remove(placedMachineToRemove.machineKey)
         plugin.logger.info("Removed instance from memory")
         //find and remove machine runtime
