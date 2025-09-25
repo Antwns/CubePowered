@@ -6,6 +6,7 @@ import dev.lone.itemsadder.api.Events.CustomBlockPlaceEvent
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.workers.MainGuiWorker
 import hut.dev.cubePowered.workers.PlacedMachineWorker
+import hut.dev.cubePowered.workers.RecipeWorker
 import org.bukkit.event.EventHandler
 import org.bukkit.plugin.Plugin
 import org.bukkit.event.Listener

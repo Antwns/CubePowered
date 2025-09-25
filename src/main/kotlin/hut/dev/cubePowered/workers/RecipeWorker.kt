@@ -1,41 +1,40 @@
 package hut.dev.cubePowered.workers
 
-import dev.triumphteam.gui.builder.item.ItemBuilder
-import dev.triumphteam.gui.guis.GuiItem
 import dev.triumphteam.gui.guis.StorageGui
 import hut.dev.cubePowered.library.MachineInstance
 import hut.dev.cubePowered.library.RecipeInstance
 import hut.dev.cubePowered.library.Lists
 import org.bukkit.Material
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
 
 class RecipeWorker {
     fun processRecipe(currentRecipe: RecipeInstance, currentPlacedMachineInstance: MachineInstance, currentGui: StorageGui, plugin: Plugin ) {
-        val currentRecipeTaskKey = currentPlacedMachineInstance.machineKey//assign a task an id based on the machine it's trying to execute in
+        val currentRecipeTaskKey = currentRecipe.recipeId + currentPlacedMachineInstance.machineKey//assign a task an id based on the machine it's trying to execute in
         if(Lists.currentRecipeTasks[currentRecipeTaskKey] != null)
         {
             plugin.logger.info("Current task with key " + currentRecipeTaskKey + " is already running! New instances are blocked!")
             return//end task early if the task is already running
         }
         val currentRecipeTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+            try {
                 if (currentPlacedMachineInstance.machinePowerMode == true) {
                     plugin.logger.info("Current machine is powered on!, checking recipe details...")
                     // 0) sanity: make sure this recipe belongs to this machine
                     if (currentRecipe.assignedMachineInstance.machineId != currentPlacedMachineInstance.machineId) return@Runnable
                     plugin.logger.info("Properly registered recipe to machine!, iterating recipe details...")
+
                     val currentGuiInventory = currentGui.inventory
 
                     // 1) verify inputs exist with enough amount
                     for ((slot, requiredItem) in currentRecipe.recipeInputItems) {
                         val currentItem = currentGuiInventory.getItem(slot)
-                        if (currentItem == null || currentItem.type == Material.AIR) return@Runnable
-                        plugin.logger.info("Verified item for slot " + slot + "! (1/3)")
-                        plugin.logger.info("Found: " + currentItem.amount + "*" + currentItem.type + "|Expected: " + requiredItem.amount + "*" + requiredItem.type + "| Slot: " + slot + "|Detailed data comparison: " + requiredItem.toString() + " |<|>| " + currentItem.toString()  )
-                        if (!currentItem.isSimilar (requiredItem)) return@Runnable              // same type/meta (works for IA items if stacks match)
-                        plugin.logger.info("Verified item for slot " + slot + "! (2/3)")
+
+                        if (currentItem == null || currentItem.type == Material.AIR) {
+                            plugin.logger.info("Found: " + currentItem!!.amount + "*" + currentItem.type + "|Expected: " + requiredItem.amount + "*" + requiredItem.type + "| Slot: " + slot + "|Detailed data comparison: " + requiredItem.toString() + " |<|>| " + currentItem.toString())
+                            return@Runnable
+                        }
+                        if (!currentItem.isSimilar(requiredItem)) return@Runnable              // same type/meta (works for IA items if stacks match)
                         if (currentItem.amount < requiredItem.amount) return@Runnable              // not enough
-                        plugin.logger.info("Verified item for slot " + slot + "! (3/3)")
                     }
                     plugin.logger.info("Input slots verified! Checking output slots...")
 
@@ -77,11 +76,14 @@ class RecipeWorker {
                         }
                         plugin.logger.info("Ejected output item in slot " + slot + "!")
                     }
-                }
-                else
-                {
+                } else {
                     return@Runnable
                 }
+            }
+            catch (e: Exception)
+            {
+                //silent fail
+            }
             }, currentRecipe.recipeProcessingTime/2L, currentRecipe.recipeProcessingTime/2L//tweak processing speed algo at some point!
         )
         Lists.currentRecipeTasks[currentRecipeTaskKey] = currentRecipeTask

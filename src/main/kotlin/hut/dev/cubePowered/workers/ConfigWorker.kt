@@ -215,7 +215,7 @@ object ConfigWorker {
                 recipeInputItems = inputs,
                 recipeOutputItems = outputs,
                 recipeProcessingTime = timeTicks,
-                recipeEnergyConsumption = energyCost
+                recipeEnergyConsumption = energyCost,
             )
 
             Lists.recipeInstances.add(recipe)
