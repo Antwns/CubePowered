@@ -1,0 +1,5 @@
+name: CubePowered
+version: '0.1'
+main: hut.dev.cubePowered.CubePowered
+api-version: '1.21'
+depend: [ItemsAdder]
