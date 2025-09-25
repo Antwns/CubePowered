@@ -20,7 +20,6 @@ object IntegrityWorker {
         inventorySize: Int,
         inputSlots: List<Int>,
         outputSlots: List<Int>,
-        fuelSlots: List<Int>
     ): Boolean {
         val effectiveInventorySize = when ("chest") {
             "chest" -> inventorySize
@@ -37,26 +36,15 @@ object IntegrityWorker {
             logger().error("Machine '$machineId': output slot index out of bounds (size=$effectiveInventorySize). slots=$outputSlots")
             return false
         }
-        if (!fuelSlots.isInBounds()) {
-            logger().error("Machine '$machineId': fuel slot index out of bounds (size=$effectiveInventorySize). slots=$fuelSlots")
-            return false
-        }
 
         // ---- NEW: Overlap check ----
         val inputSet = inputSlots.toSet()
         val outputSet = outputSlots.toSet()
-        val fuelSet = fuelSlots.toSet()
 
         val overlaps = mutableListOf<String>()
 
         if (inputSet.intersect(outputSet).isNotEmpty()) {
             overlaps.add("input/output: ${inputSet.intersect(outputSet)}")
-        }
-        if (inputSet.intersect(fuelSet).isNotEmpty()) {
-            overlaps.add("input/fuel: ${inputSet.intersect(fuelSet)}")
-        }
-        if (outputSet.intersect(fuelSet).isNotEmpty()) {
-            overlaps.add("output/fuel: ${outputSet.intersect(fuelSet)}")
         }
 
         if (overlaps.isNotEmpty()) {

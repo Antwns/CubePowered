@@ -19,8 +19,8 @@ internal object PlacedMachineWorker {
         val blockWorld = e.block.world.name
 
         var foundDuplicate = false
-        for (machineLocToCheck in Lists.placedMachinesInstances) {
-            if (machineLocToCheck.machineX == blockX && machineLocToCheck.machineY == blockY && machineLocToCheck.machineZ == blockZ && machineLocToCheck.machineWorld == blockWorld) {
+        for (machineInstanceToCheck in Lists.placedMachinesInstances) {
+            if (machineInstanceToCheck.machineX == blockX && machineInstanceToCheck.machineY == blockY && machineInstanceToCheck.machineZ == blockZ && machineInstanceToCheck.machineWorld == blockWorld) {
                 foundDuplicate = true
                 plugin.logger.info("Stopped invalid machine registration to avoid duplicates!")
                 break
@@ -40,7 +40,6 @@ internal object PlacedMachineWorker {
                 machineKey = blockWorld + "," + blockX + "," + blockY + "," + blockZ,                 //register machine's runtime
                 machineContents = currentMachineInstance.machineContents,
                 model = currentMachineInstance.model,
-                fuelTypes = currentMachineInstance.fuelTypes,
                 guiOnLabel = currentMachineInstance.guiOnLabel,
                 guiOffLabel = currentMachineInstance.guiOffLabel,
                 energyBuffer = currentMachineInstance.energyBuffer,

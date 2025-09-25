@@ -9,7 +9,6 @@ data class MachineInstance
     val model: String,
     val machineTitle: String,
     val inventorySize: Int,
-    val fuelTypes: List<Int>,
     val lockedSlotsMaterial: String,
     val energyEnabled: Boolean,
     val energyPerTick: Int,

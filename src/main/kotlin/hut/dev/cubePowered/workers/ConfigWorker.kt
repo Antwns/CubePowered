@@ -1,5 +1,6 @@
 package hut.dev.cubePowered.workers
 
+import hut.dev.cubePowered.library.ConductorInstance
 import hut.dev.cubePowered.library.MachineInstance
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.library.RecipeInstance
@@ -13,20 +14,27 @@ object ConfigWorker {
     internal var loadedMachinesTotal = 0
     internal var loadedMachineGuisTotal = 0
     internal var loadedRecipesTotal = 0
-    /** Load/refresh all machine instances from plugins/CubePowered/machines/.yml */
+    internal var loadedConductorsTotal = 0
+    /** Load/ all data from plugins/CubePowered/*/.yml */*/
     fun loadData(dataFolder: File)
     {
         FileWorker().ensureExampleMachineFile(dataFolder)
+        FileWorker().ensureExampleRecipeFile(dataFolder)
+        FileWorker().ensureConductorFile(dataFolder)
 
         val machinesDir = File(dataFolder, "machines")
         val recipesDir = File(dataFolder, "recipes")
+        val conductorsDir = File(dataFolder, "conductors")
         if (!machinesDir.exists()) machinesDir.mkdirs()
         if (!recipesDir.exists()) recipesDir.mkdirs()
+        if (!conductorsDir.exists()) conductorsDir.mkdirs()
 
-        Lists.machineInstances.clear()
+        Lists.machineInstances.clear()//may remove in the future
+
         loadedMachineGuisTotal = 0
         loadedMachinesTotal = 0
         loadedRecipesTotal = 0
+        loadedConductorsTotal = 0
 
         val machineFiles = machinesDir.listFiles { f ->
             f.isFile && f.name.endsWith(".yml", ignoreCase = true)
@@ -36,7 +44,13 @@ object ConfigWorker {
             f.isFile && f.name.endsWith(".yml", ignoreCase = true)
         } ?: emptyArray()
 
+        val conductorFiles = conductorsDir.listFiles { f ->
+            f.isFile && f.name.endsWith(".yml", ignoreCase = true)
+        }
+
         logger().info("Found " + machineFiles.size + " machine file(s) in " + machinesDir.absolutePath)
+        logger().info("Found " + recipeFiles.size + " recipe file(s) in " + recipesDir.absolutePath)
+        logger().info("Found " + conductorFiles.size + " conductor file(s) in " + conductorsDir.absolutePath)
 
         machineFiles.forEach { machineDefinitionFile ->
             loadOneMachineFile(machineDefinitionFile)
@@ -51,7 +65,13 @@ object ConfigWorker {
             loadOneRecipeFile(recipeDefinitionFile)
         }
 
-        logger().info("Loaded " + loadedRecipesTotal + " recipe defintions" )
+        logger().info("Loaded " + loadedRecipesTotal + " recipe definitions" )
+
+        conductorFiles.forEach { conductorDefinitionFile ->
+            loadOneConductorFile(conductorDefinitionFile)
+        }
+
+        logger().info("Loaded " + loadedConductorsTotal + " conductor definitions")
     }
 
     /** Load one file with top-level machine ids. */
@@ -81,7 +101,6 @@ object ConfigWorker {
 
             val inputSlots = sec.getIntegerList("slots.input")
             val outputSlots = sec.getIntegerList("slots.output")
-            val fuelSlots = sec.getIntegerList("slots.fuel")
             val lockedSlotsMaterial = sec.getString("slots.locked_slots_material") ?: "minecraft:black_stained_glass_pane"
 
             val energySec = sec.getConfigurationSection("energy")
@@ -105,7 +124,7 @@ object ConfigWorker {
             val guiOnLabel = guiSec?.getString("on_label") ?: "Auto: ON"
             val guiOffLabel = guiSec?.getString("off_label") ?: "Auto: OFF"
 
-            if (!verifySlotIntegrity(id, inventorySize, inputSlots, outputSlots, fuelSlots)) {
+            if (!verifySlotIntegrity(id, inventorySize, inputSlots, outputSlots)) {
                 logger().error("Skipping machine with id " + id + " due to invalid slot configuration.")
                 continue
             }
@@ -118,7 +137,6 @@ object ConfigWorker {
                 guiInputSlots = inputSlots,
                 guiLockedSlots = IntegrityWorker.getLockedSlotsFromInfo(inventorySize, inputSlots, outputSlots),
                 guiOutputSlots = outputSlots,
-                fuelTypes = fuelSlots,
                 lockedSlotsMaterial = lockedSlotsMaterial,
                 energyEnabled = energyEnabled,
                 energyPerTick = energyPerTick,
@@ -224,6 +242,68 @@ object ConfigWorker {
             logger().info(
                 "Loaded recipe " + rid + " for machine " + assignedMachineId + " (inputs=" + inputs.size + ", outputs=" + outputs.size + ", time=" + timeTicks + ", energy=" + energyCost + ")"
             )
+        }
+    }
+
+    private fun loadOneConductorFile(file: File)
+    {
+        logger().info("Loading conductor file " + file.name + "...")
+        val cfg = YamlConfiguration()
+        try {
+            cfg.load(file)
+        } catch (e: Exception) {
+            logger().error("Failed to parse YAML '" + file.name + "': " + e.message)
+            e.printStackTrace()
+            return
+        }
+
+        val ids = cfg.getKeys(false)
+        if (ids.isEmpty()) return
+
+        for (cid in ids)
+        {
+            val sec = cfg.getConfigurationSection(cid) ?: continue
+
+            val model = sec.getString("model") ?: run {
+                logger().error("Conductor '" + cid + "': missing 'model' -> skipping.")
+                continue
+            }
+
+            val maxPower = sec.getInt("max_power", 0)
+            if (maxPower <= 0) {
+                logger().error("Conductor '" + cid + "': 'max_power' must be > 0 -> skipping.")
+                continue
+            }
+
+            // Read optional behavior flags (not stored in ConductorInstance yet)
+            val explodeOnOverload = sec.getBoolean("explode_on_overload", false)
+            val explodePower      = sec.getInt("explode_power", 0)
+            val vanishOnOverload  = sec.getBoolean("vanishOnOverload", false)
+
+            if (explodeOnOverload || vanishOnOverload || explodePower > 0) {
+                logger().warn("Conductor '" + cid + "': overload settings present (explode_on_overload=" + explodeOnOverload +
+                        ", explode_power=" + explodePower + ", vanishOnOverload=" + vanishOnOverload + ") – ignored for now.")
+            }
+
+            val conductor = ConductorInstance(
+                conductorId = cid,
+                conductorModel = model,
+                conductorKey = null,            // filled at runtime on placement
+                conductorWorld = null,          // filled at runtime on placement
+                conductorX = null,              // filled at runtime on placement
+                conductorY = null,              // filled at runtime on placement
+                conductorZ = null,              // filled at runtime on placement
+                conductorMaxPower = maxPower,
+                conductorCurrentPower = 0,
+                conductorExplodeOnOverload = explodeOnOverload,
+                conductorExplodePower = explodePower,
+                conductorVanishOnOverload = vanishOnOverload
+            )
+
+            Lists.conductorInstances.add(conductor)
+            loadedConductorsTotal++
+
+            logger().info("Loaded conductor " + cid + " model=" + model + " max_power=" + maxPower)
         }
     }
 }

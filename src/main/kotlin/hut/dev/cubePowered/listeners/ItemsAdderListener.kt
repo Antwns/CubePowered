@@ -5,8 +5,8 @@ import dev.lone.itemsadder.api.Events.CustomBlockInteractEvent
 import dev.lone.itemsadder.api.Events.CustomBlockPlaceEvent
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.workers.MainGuiWorker
+import hut.dev.cubePowered.workers.PlacedConductorWorker
 import hut.dev.cubePowered.workers.PlacedMachineWorker
-import hut.dev.cubePowered.workers.RecipeWorker
 import org.bukkit.event.EventHandler
 import org.bukkit.plugin.Plugin
 import org.bukkit.event.Listener
@@ -20,9 +20,15 @@ class ItemsAdderListener(private val plugin: Plugin) : Listener
         val blockLocation = e.block.location
         val blockWorld = e.block.world.name
         plugin.logger.info("CustomBlock " + blockID + " placed at " + blockWorld + " " + blockLocation.x + " " + blockLocation.y + " " + blockLocation.z)
+        //handle machine placement
         if (Lists.machineInstances.any{ it.model == blockID } == true)
         {
             PlacedMachineWorker.handleNewPlacedMachine(e, plugin)
+        }
+        //handle conductor placement
+        if (Lists.conductorInstances.any{ it.conductorModel == blockID } == true)
+        {
+            PlacedConductorWorker.handleNewPlacedConductor(e, plugin)
         }
     }
 

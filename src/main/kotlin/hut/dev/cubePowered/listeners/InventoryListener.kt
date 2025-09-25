@@ -13,7 +13,7 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.Plugin
 import java.util.UUID
 
-class InventoryListeners(private val plugin: Plugin): Listener
+class InventoryListener(private val plugin: Plugin): Listener
 {
     @EventHandler
     fun onInventoryClick(e: InventoryClickEvent) {//something is returning null, must fix

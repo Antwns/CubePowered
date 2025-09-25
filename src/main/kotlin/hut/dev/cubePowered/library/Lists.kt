@@ -15,4 +15,10 @@ object Lists
     val recipeInstances: MutableList<RecipeInstance> = mutableListOf()
 
     val currentRecipeTasks: MutableMap<String, BukkitTask> = mutableMapOf()
+
+    val conductorInstances: MutableList<ConductorInstance> = mutableListOf()
+
+    val placedConductorInstances: MutableMap<String, ConductorInstance> = mutableMapOf()
+
+    val placedPowerNodes: MutableMap<String, PowerNode> = mutableMapOf()
 }
