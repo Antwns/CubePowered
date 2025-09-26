@@ -264,8 +264,13 @@ object ConfigWorker {
         {
             val sec = cfg.getConfigurationSection(cid) ?: continue
 
-            val model = sec.getString("model") ?: run {
-                logger().error("Conductor '" + cid + "': missing 'model' -> skipping.")
+            val knobModel = sec.getString("knob_model") ?: run {
+                logger().error("Conductor '" + cid + "': missing 'knob_model' -> skipping.")
+                continue
+            }
+
+            val connectorModel = sec.getString("connector_model") ?: run {
+                logger().error("Conductor '" + cid + "': missing 'connector_model' -> skipping.")
                 continue
             }
 
@@ -280,14 +285,10 @@ object ConfigWorker {
             val explodePower      = sec.getInt("explode_power", 0)
             val vanishOnOverload  = sec.getBoolean("vanishOnOverload", false)
 
-            if (explodeOnOverload || vanishOnOverload || explodePower > 0) {
-                logger().warn("Conductor '" + cid + "': overload settings present (explode_on_overload=" + explodeOnOverload +
-                        ", explode_power=" + explodePower + ", vanishOnOverload=" + vanishOnOverload + ") – ignored for now.")
-            }
-
             val conductor = ConductorInstance(
                 conductorId = cid,
-                conductorModel = model,
+                conductorKnobModel = knobModel,
+                conductorConnectorModel = connectorModel,
                 conductorKey = null,            // filled at runtime on placement
                 conductorWorld = null,          // filled at runtime on placement
                 conductorX = null,              // filled at runtime on placement
@@ -303,7 +304,7 @@ object ConfigWorker {
             Lists.conductorInstances.add(conductor)
             loadedConductorsTotal++
 
-            logger().info("Loaded conductor " + cid + " model=" + model + " max_power=" + maxPower)
+            logger().info("Loaded conductor " + cid + " knob_model=" + knobModel + " connector_model=" + connectorModel + " max_power=" + maxPower)
         }
     }
 }

@@ -18,7 +18,8 @@ object Lists
 
     val conductorInstances: MutableList<ConductorInstance> = mutableListOf()
 
-    val placedConductorInstances: MutableMap<String, ConductorInstance> = mutableMapOf()
+    val placedConductorInstances: MutableList<ConductorInstance> = mutableListOf()
 
-    val placedPowerNodes: MutableMap<String, PowerNode> = mutableMapOf()
+    //power nodes
+    val placedPowerNodes: MutableList<PowerNode> = mutableListOf()
 }

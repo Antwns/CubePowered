@@ -26,7 +26,7 @@ class ItemsAdderListener(private val plugin: Plugin) : Listener
             PlacedMachineWorker.handleNewPlacedMachine(e, plugin)
         }
         //handle conductor placement
-        if (Lists.conductorInstances.any{ it.conductorModel == blockID } == true)
+        if (Lists.conductorInstances.any{ it.conductorKnobModel == blockID } == true)
         {
             PlacedConductorWorker.handleNewPlacedConductor(e, plugin)
         }
@@ -38,8 +38,23 @@ class ItemsAdderListener(private val plugin: Plugin) : Listener
         val blockID = e.namespacedID
         val blockLocation = e.block.location
         val blockWorld = e.block.world.name
+        val possibleBlockKey = blockWorld + "," + blockLocation.blockX + "," + blockLocation.blockY + "," + blockLocation.blockZ
         plugin.logger.info("CustomBlock " + blockID + " broken at " + blockWorld + " " + blockLocation.x + " " + blockLocation.y + " " + blockLocation.z)
-        PlacedMachineWorker.handleBrokenMachine(e, plugin)
+        if(Lists.placedMachinesInstances.any { it.machineKey ==  possibleBlockKey}) {
+            PlacedMachineWorker.handleBrokenMachine(e, plugin)
+        }
+        else
+        {
+            plugin.logger.warning("Couldn't find a placed machine instance with key " + possibleBlockKey)
+        }
+        if(Lists.placedConductorInstances.any{ it.conductorKey == possibleBlockKey})
+        {
+            PlacedConductorWorker.handleBrokenConductor(e, plugin)
+        }
+        else
+        {
+            plugin.logger.warning("Couldn't find a placed conductor instance with key " + possibleBlockKey)
+        }
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -3,9 +3,11 @@ package hut.dev.cubePowered.workers
 import dev.lone.itemsadder.api.Events.CustomBlockBreakEvent
 import dev.lone.itemsadder.api.Events.CustomBlockPlaceEvent
 import dev.triumphteam.gui.guis.Gui
+import hut.dev.cubePowered.library.ConductorInstance
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.library.MachineInstance
 import net.kyori.adventure.text.Component
+import org.bukkit.block.BlockFace
 import org.bukkit.plugin.Plugin
 import org.bukkit.scheduler.BukkitTask
 
@@ -37,7 +39,7 @@ internal object PlacedMachineWorker {
                 machineY = blockY,
                 machineZ = blockZ,
                 machineWorld = blockWorld,
-                machineKey = blockWorld + "," + blockX + "," + blockY + "," + blockZ,                 //register machine's runtime
+                machineKey = blockWorld + "," + blockX + "," + blockY + "," + blockZ,                 //register machine's runtime key
                 machineContents = currentMachineInstance.machineContents,
                 model = currentMachineInstance.model,
                 guiOnLabel = currentMachineInstance.guiOnLabel,
@@ -78,6 +80,7 @@ internal object PlacedMachineWorker {
                 RecipeWorker().processRecipe(currentRecipe, placedMachineInstanceToAdd, guiInstanceToAdd!!, plugin)
                 plugin.logger.info("Registered recipe " + currentRecipe.recipeId + " to machine with key " + placedMachineInstanceToAdd.machineKey)
             }
+            PlacedConductorWorker.attachNearbyConductorsToMachine(e.block, plugin)
         }
     }
 
@@ -121,6 +124,8 @@ internal object PlacedMachineWorker {
             Lists.currentRecipeTasks.remove(recipeTaskToRemove.key)
             plugin.logger.info("Removed recipe task with key " + recipeTaskToRemove.key)
             plugin.logger.info("Finished cleaning data for formerly placed machine with key " + placedMachineToRemove.machineKey)
+
+            PlacedConductorWorker.detachNearbyConductorsFromMachine(e.block, plugin)
         }
         recipeTasksToRemove.clear()//clear the checker
     }
