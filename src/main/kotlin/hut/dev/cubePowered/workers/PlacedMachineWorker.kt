@@ -81,6 +81,7 @@ internal object PlacedMachineWorker {
                 plugin.logger.info("Registered recipe " + currentRecipe.recipeId + " to machine with key " + placedMachineInstanceToAdd.machineKey)
             }
             PlacedConductorWorker.attachNearbyConductorsToMachine(e.block, plugin)
+            PlacedMachineHelperWorker.upsertPowerNodeOnMachinePlacement(placedMachineInstanceToAdd, plugin)
         }
     }
 
@@ -126,6 +127,8 @@ internal object PlacedMachineWorker {
             plugin.logger.info("Finished cleaning data for formerly placed machine with key " + placedMachineToRemove.machineKey)
 
             PlacedConductorWorker.detachNearbyConductorsFromMachine(e.block, plugin)
+            PlacedMachineHelperWorker.updatePowerNodesOnMachineBreak(placedMachineToRemove.machineKey!!, plugin)
+
         }
         recipeTasksToRemove.clear()//clear the checker
     }

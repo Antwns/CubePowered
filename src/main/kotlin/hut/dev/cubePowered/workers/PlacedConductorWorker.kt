@@ -8,15 +8,16 @@ import hut.dev.cubePowered.library.ConductorInstance
 import hut.dev.cubePowered.library.Lists
 import hut.dev.cubePowered.library.attachFace
 import hut.dev.cubePowered.library.detachFace
-import hut.dev.cubePowered.workers.ConductorOrienterWorker.upsertPowerNodeOnConductorPlacement
 import org.bukkit.Bukkit
 import org.bukkit.block.Block
 import org.bukkit.block.TileState
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
 
-object PlacedConductorWorker {
-    fun handleNewPlacedConductor(e: CustomBlockPlaceEvent, plugin: Plugin) {
+object PlacedConductorWorker
+{
+    fun handleNewPlacedConductor(e: CustomBlockPlaceEvent, plugin: Plugin)
+    {
         val conductorInstanceType = Lists.conductorInstances.first { it.conductorKnobModel == e.namespacedID } // using the knob as the base
         val placedConductorInstanceToAdd = ConductorInstance(
             conductorId = conductorInstanceType.conductorId,
@@ -48,19 +49,15 @@ object PlacedConductorWorker {
         val block = e.block
         var connections = 0
 
-        // 1) connect to neighbors (conductors or machines)
+        // connect to neighbors (conductors or machines)
         for (face in facesSix()) {
             val nb = block.getRelative(face)
 
-            // (A) Neighbor is a placed conductor?
             val neighbor = findPlacedConductor(nb.world.name, nb.x, nb.y, nb.z)
             val attachToConductor = (neighbor != null)
-
-            // (B) Or is it an attachable machine?
             val attachToMachine = (!attachToConductor && isAttachableMachine(nb))
 
             if (attachToConductor || attachToMachine) {
-                // spawn our arm+end-knob toward that neighbor
                 val (arm, endKnob) = ConductorOrienterWorker.spawnArmAndKnob(
                     block = block,
                     connector = connectorStack,
@@ -72,14 +69,11 @@ object PlacedConductorWorker {
                 placedConductorInstanceToAdd.attachFace(face, ConductorDisplayPair(arm.uniqueId, endKnob.uniqueId))
                 connections++
 
-                // 2) if neighbor is a conductor, ask it to attach back toward us (reciprocal)
                 if (neighbor != null) {
-                    // build neighbor's own model stacks (so it can use its template skins)
                     val nbConnector = ItemWorker.getItemStackFromString(neighbor.conductorConnectorModel)
                     val nbKnob = ItemWorker.getItemStackFromString(neighbor.conductorKnobModel)
                     if (nbConnector != null && nbKnob != null) {
                         val opp = opposite(face)
-                        // don't double-spawn if it already has this face
                         if (!neighbor.faceDisplays.containsKey(opp)) {
                             val (nArm, nKnob) = ConductorOrienterWorker.spawnArmAndKnob(
                                 block = nb,
@@ -97,15 +91,14 @@ object PlacedConductorWorker {
         }
 
         if (connections == 0) {
-            // nothing to spawn; the placed IA block already shows the center knob
             plugin.logger.info("Conductor " + placedConductorInstanceToAdd.conductorId + " has no neighbors; stays as center knob only.")
         } else {
             plugin.logger.info("Conductor " + placedConductorInstanceToAdd.conductorId + " connected on " + connections + " face(s).")
         }
 
-        upsertPowerNodeOnConductorPlacement(placedConductorInstanceToAdd, plugin)
+        // PowerNode placement upsert
+        NodeWorker.upsertPowerNodeOnConductorPlacement(placedConductorInstanceToAdd, plugin)
     }
-
 
     fun handleBrokenConductor(e: CustomBlockBreakEvent, plugin: Plugin)
     {
@@ -113,7 +106,7 @@ object PlacedConductorWorker {
         val state = block.state
         val blockKey = keyOf(block.world.name, block.x, block.y, block.z)
 
-        // --- keep your PDC debug as-is ---
+        // PDC debug (unchanged)
         if (state is TileState) {
             val pdc = state.persistentDataContainer
             if (pdc.keys.isEmpty()) {
@@ -130,7 +123,6 @@ object PlacedConductorWorker {
             plugin.logger.info("[PDC] " + block.type + " is not a TileState; no PDC available.")
         }
 
-        // find & remove the placed conductor instance
         val placed = Lists.placedConductorInstances.firstOrNull { it.conductorKey == blockKey }
         if (placed == null) {
             plugin.logger.warning("[Conductor] Break @ " + blockKey + " but no placed instance found.")
@@ -139,9 +131,9 @@ object PlacedConductorWorker {
         Lists.placedConductorInstances.remove(placed)
         plugin.logger.info("Broken valid conductor with key: " + placed.conductorKey)
 
-        // 1) remove ALL displays owned by this conductor (to machines and conductors)
+        // remove all displays owned by this conductor
         var removedSelf = 0
-        val ownPairs = placed.faceDisplays.values.toList() // copy first
+        val ownPairs = placed.faceDisplays.values.toList()
         placed.faceDisplays.clear()
         ownPairs.forEach { pair ->
             Bukkit.getEntity(pair.connectorId)?.remove()
@@ -149,7 +141,7 @@ object PlacedConductorWorker {
             removedSelf++
         }
 
-        // 2) for EACH neighbor conductor, remove its reciprocal face pointing toward THIS block
+        // remove reciprocal displays from neighbor conductors
         var removedNeighbors = 0
         for (face in facesSix()) {
             val nb = block.getRelative(face)
@@ -163,26 +155,25 @@ object PlacedConductorWorker {
             }
         }
 
-        plugin.logger.info(
-            "[Conductor] Cleanup @ " + blockKey +
-                    " removedSelf=" + removedSelf + " removedNeighbors=" + removedNeighbors
-        )
+        plugin.logger.info("[Conductor] Cleanup @ " + blockKey + " removedSelf=" + removedSelf + " removedNeighbors=" + removedNeighbors)
 
-        // keep your extra debug line
         plugin.logger.info(
             "Conductor info: " + block.blockData.toString() + " || " + block.toString() +
                     "||" + block.state + "||" + block.temperature + "||" +
                     CustomBlock.byAlreadyPlaced((block))!!.baseBlockData
         )
+
+        // PowerNode break maintenance
+        NodeWorker.updatePowerNodesOnConductorBreak(blockKey, plugin)
     }
 
-    private fun facesSix() = listOf(
+    fun facesSix() = listOf(
         org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH,
         org.bukkit.block.BlockFace.EAST,  org.bukkit.block.BlockFace.WEST,
         org.bukkit.block.BlockFace.UP,    org.bukkit.block.BlockFace.DOWN
     )
 
-    private fun opposite(face: org.bukkit.block.BlockFace) = when (face) {
+    fun opposite(face: org.bukkit.block.BlockFace) = when (face) {
         org.bukkit.block.BlockFace.NORTH -> org.bukkit.block.BlockFace.SOUTH
         org.bukkit.block.BlockFace.SOUTH -> org.bukkit.block.BlockFace.NORTH
         org.bukkit.block.BlockFace.EAST  -> org.bukkit.block.BlockFace.WEST
@@ -192,35 +183,30 @@ object PlacedConductorWorker {
         else -> org.bukkit.block.BlockFace.SELF
     }
 
-    private fun keyOf(world: String, x: Int, y: Int, z: Int) = world + "," + x + "," + y + "," + z
+    fun keyOf(world: String, x: Int, y: Int, z: Int) = world + "," + x + "," + y + "," + z
 
-    private fun findPlacedConductor(world: String, x: Int, y: Int, z: Int): ConductorInstance?
+    fun findPlacedConductor(world: String, x: Int, y: Int, z: Int): ConductorInstance?
     {
         val k = keyOf(world, x, y, z)
         return Lists.placedConductorInstances.firstOrNull { it.conductorKey == k }
     }
 
-    private fun isAttachableMachine(b: Block): Boolean
+    fun isAttachableMachine(b: Block): Boolean
     {
-        // A machine is “attachable” if we have a runtime for it at these coords.
         val key = b.world.name + "," + b.x + "," + b.y + "," + b.z
-        return Lists.placedMachinesInstances.any{it.machineKey == key}
+        return Lists.placedMachinesInstances.any { it.machineKey == key }
     }
 
-    fun attachNearbyConductorsToMachine(machineBlock: Block, plugin: Plugin) {
+    fun attachNearbyConductorsToMachine(machineBlock: Block, plugin: Plugin)
+    {
         var made = 0
 
         for (face in facesSix()) {
             val nb = machineBlock.getRelative(face)
             val neighbor = findPlacedConductor(nb.world.name, nb.x, nb.y, nb.z) ?: continue
-
-            // Conductor should face back toward the machine
             val conductorFace = opposite(face)
-
-            // Skip if already connected on that face
             if (neighbor.faceDisplays.containsKey(conductorFace)) continue
 
-            // Use the neighbor CONDUCTOR's own models
             val nbConnector = ItemWorker.getItemStackFromString(neighbor.conductorConnectorModel)
             val nbKnob = ItemWorker.getItemStackFromString(neighbor.conductorKnobModel)
             if (nbConnector == null || nbKnob == null) {
@@ -228,7 +214,6 @@ object PlacedConductorWorker {
                 continue
             }
 
-            // Spawn on the CONDUCTOR block, facing toward the machine
             val (arm, endKnob) = ConductorOrienterWorker.spawnArmAndKnob(
                 block = nb,
                 connector = nbConnector,
@@ -243,28 +228,21 @@ object PlacedConductorWorker {
 
         if (made > 0) {
             plugin.logger.info(
-                "[Conductor] Connected " + made + " conductor face(s) to new machine @ " + keyOf(
-                    machineBlock.world.name,
-                    machineBlock.x,
-                    machineBlock.y,
-                    machineBlock.z
-                )
+                "[Conductor] Connected " + made + " conductor face(s) to new machine @ " +
+                        keyOf(machineBlock.world.name, machineBlock.x, machineBlock.y, machineBlock.z)
             )
         }
     }
+
     fun detachNearbyConductorsFromMachine(machineBlock: Block, plugin: Plugin)
     {
         var removed = 0
 
-        for (face in facesSix())
-        {
+        for (face in facesSix()) {
             val nb = machineBlock.getRelative(face)
             val neighbor = findPlacedConductor(nb.world.name, nb.x, nb.y, nb.z) ?: continue
-
-            // Conductor was facing back toward the machine on the opposite face
             val conductorFace = opposite(face)
 
-            // Remove the DisplayPair from the conductor and delete entities
             neighbor.detachFace(conductorFace)?.let { pair ->
                 Bukkit.getEntity(pair.connectorId)?.remove()
                 Bukkit.getEntity(pair.knobId)?.remove()
@@ -272,10 +250,11 @@ object PlacedConductorWorker {
             }
         }
 
-        if (removed > 0)
-        {
-            plugin.logger.info("[Conductor] Detached " + removed + " conductor face(s) from broken machine @ " +
-                    machineBlock.world.name + "," + machineBlock.x + "," + machineBlock.y + "," + machineBlock.z)
+        if (removed > 0) {
+            plugin.logger.info(
+                "[Conductor] Detached " + removed + " conductor face(s) from broken machine @ " +
+                        machineBlock.world.name + "," + machineBlock.x + "," + machineBlock.y + "," + machineBlock.z
+            )
         }
     }
 }

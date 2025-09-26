@@ -1,7 +1,6 @@
 package hut.dev.cubePowered.library
 
 import dev.triumphteam.gui.guis.StorageGui
-import org.bukkit.Bukkit
 import org.bukkit.scheduler.BukkitTask
 
 object Lists
@@ -21,5 +20,5 @@ object Lists
     val placedConductorInstances: MutableList<ConductorInstance> = mutableListOf()
 
     //power nodes
-    val placedPowerNodes: MutableList<PowerNode> = mutableListOf()
+    val placedPowerNodes: MutableList<PowerNodeInstance> = mutableListOf()
 }

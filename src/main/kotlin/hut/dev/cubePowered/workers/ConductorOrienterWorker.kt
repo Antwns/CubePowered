@@ -3,7 +3,7 @@ package hut.dev.cubePowered.workers
 import hut.dev.cubePowered.library.ConductorDisplayPair
 import hut.dev.cubePowered.library.ConductorInstance
 import hut.dev.cubePowered.library.Lists
-import hut.dev.cubePowered.library.PowerNode
+import hut.dev.cubePowered.library.PowerNodeInstance
 import hut.dev.cubePowered.library.attachFace
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
@@ -15,6 +15,7 @@ import org.bukkit.plugin.Plugin
 import org.joml.Quaternionf
 import org.joml.Vector3f
 import java.util.UUID
+import kotlin.random.Random
 
 object ConductorOrienterWorker
 {
@@ -193,13 +194,13 @@ object ConductorOrienterWorker
     }
 
     /** Find the first PowerNode that already has a conductor adjacent to 'c'. */
-    fun findAdjacentPowerNodeForConductor(c: ConductorInstance): PowerNode?
+    fun findAdjacentPowerNodeForConductor(c: ConductorInstance): PowerNodeInstance?
     {
         val adj = adjacentKeys(c.conductorWorld, c.conductorX, c.conductorY, c.conductorZ)
         if (adj.isEmpty()) return null
 
         return Lists.placedPowerNodes.firstOrNull { node ->
-            node.powerNodePlacedConductors.values.any { pc ->
+            node.powerNodePlacedConductors.any { pc ->
                 val k = pc.conductorKey
                 k != null && adj.contains(k)
             }
@@ -207,38 +208,38 @@ object ConductorOrienterWorker
     }
 
     /** Create a new node seeded with this conductor (LIST variant). */
-    fun createPowerNodeFor(conductor: ConductorInstance): PowerNode
+    fun createPowerNodeFor(conductor: ConductorInstance): PowerNodeInstance
     {
         val nodeKey = "node:" + (conductor.conductorKey ?: UUID.randomUUID().toString())
-        val node = PowerNode(
+        val node = PowerNodeInstance(
             powerNodeKey = nodeKey,
             powerNodeIncome = 0,
             powerNodeExpenditure = 0,
-            powerNodeStoredPower = 0
         )
         val ck = conductor.conductorKey
         if (ck != null)
         {
-            node.powerNodePlacedConductors[ck] = conductor
+            node.powerNodePlacedConductors.add(conductor)
         }
         return node
     }
 
     /** Attach a conductor to an existing node. */
-    fun attachConductorToNode(node: PowerNode, conductor: ConductorInstance, plugin: Plugin)
+    fun attachConductorToNode(node: PowerNodeInstance, conductor: ConductorInstance, plugin: Plugin)
     {
         val ck = conductor.conductorKey ?: return
-        node.powerNodePlacedConductors[ck] = conductor
+        node.powerNodePlacedConductors.add(conductor)
         plugin.logger.info("[PowerNode] Added conductor " + ck + " to node " + node.powerNodeKey)
     }
 
     /** To be called right after we add the placed ConductorInstance to Lists.placedConductorInstances. */
     fun upsertPowerNodeOnConductorPlacement(conductor: ConductorInstance, plugin: Plugin)
     {
+        // Find all nodes that already contain a conductor adjacent to this one
+        val adj = adjacentKeys(conductor.conductorWorld, conductor.conductorX, conductor.conductorY, conductor.conductorZ)
         val matches = Lists.placedPowerNodes.filter { node ->
-            node.powerNodePlacedConductors.values.any { pc ->
+            node.powerNodePlacedConductors.any { pc ->
                 val k = pc.conductorKey
-                val adj = adjacentKeys(conductor.conductorWorld, conductor.conductorX, conductor.conductorY, conductor.conductorZ)
                 k != null && adj.contains(k)
             }
         }
@@ -247,14 +248,43 @@ object ConductorOrienterWorker
         {
             val newNode = createPowerNodeFor(conductor)
             Lists.placedPowerNodes.add(newNode)
-            plugin.logger.info("[PowerNode] Created node " + newNode.powerNodeKey + " with seed conductor " + (conductor.conductorKey ?: "unknown"))
+            plugin.logger.info("[PowerNode] Created node " + (newNode.powerNodeKey ?: "unknown") +
+                    " with seed conductor " + (conductor.conductorKey ?: "unknown"))
+            return
+        }
+
+        if (matches.size == 1)
+        {
+            // Simple case: just join that node
+            attachConductorToNode(matches.first(), conductor, plugin)
+            return
+        }
+
+        // Merge case: choose winner by largest size; tie -> random among tied
+        val sizes = matches.associateWith { NodeWorker.nodeSize(it) }
+        val maxSize = sizes.values.maxOrNull() ?: 0
+        val tiedWinners = matches.filter { sizes[it] == maxSize }
+
+        val winner = if (tiedWinners.size == 1)
+        {
+            tiedWinners.first()
         }
         else
         {
-            // attach to the first matching node (simple, functional baseline)
-            attachConductorToNode(matches.first(), conductor, plugin)
-
-            // (Optional) If matches.size > 1, you might want to merge nodes later.
+            tiedWinners[Random.nextInt(tiedWinners.size)]
         }
+
+        // Merge every other matched node into the winner
+        for (n in matches)
+        {
+            if (n !== winner)
+            {
+                NodeWorker.mergeNodeIntoWinner(winner, n, plugin)
+            }
+        }
+
+        // Finally, attach the new conductor to the winner
+        attachConductorToNode(winner, conductor, plugin)
     }
+
 }
